@@ -51,8 +51,8 @@ function trySubjectSplit($: cheerio.CheerioAPI): Email[] {
   for (const el of allElements) {
     const $el = $(el);
     const text = $el.text().trim();
-    // Match "Subject:" at start of line — also handle bold/styled subject lines
-    const subjectMatch = text.match(/^Subject:\s*(.+)/i);
+    // Match variations: "Subject:", "Subject Line:", "Subject line -", "SL:", etc.
+    const subjectMatch = text.match(/^(?:Subject\s*(?:Line)?|SL)\s*[:\-–—]\s*(.+)/i);
 
     if (subjectMatch) {
       // Save previous email if exists

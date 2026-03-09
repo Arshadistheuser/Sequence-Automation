@@ -7,43 +7,47 @@ interface EmailPreviewProps {
 }
 
 /**
- * Prepares the HTML body for clipboard copy by adding inline styles
- * so that formatting (spacing, fonts, etc.) survives pasting into HubSpot.
- * CSS classes are NOT preserved in clipboard HTML — only inline styles work.
+ * Prepares the HTML body for clipboard copy so that formatting survives
+ * pasting into HubSpot's template editor.
+ *
+ * HubSpot's editor strips CSS classes and most styles. The most reliable
+ * way to preserve paragraph spacing is to insert <br> tags between
+ * paragraphs, because HubSpot respects line breaks natively.
  */
 function prepareHtmlForClipboard(bodyHtml: string): string {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = bodyHtml;
 
-  // Add spacing to paragraphs
-  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
-    p.style.margin = "0";
-    p.style.marginBottom = "10px";
-    p.style.lineHeight = "1.6";
+  // Convert <p> tags to content + <br><br> for paragraph spacing
+  // This is the most reliable method for HubSpot's editor
+  const paragraphs = wrapper.querySelectorAll("p");
+  paragraphs.forEach((p: HTMLElement, index: number) => {
+    const content = p.innerHTML.trim();
+
+    // Empty paragraph = line break
+    if (content === "" || content === "<br>") {
+      p.outerHTML = "<br>";
+      return;
+    }
+
+    // For the last paragraph, don't add trailing breaks
+    if (index === paragraphs.length - 1) {
+      p.outerHTML = content;
+    } else {
+      // Add a blank line after each paragraph for spacing
+      p.outerHTML = content + "<br><br>";
+    }
   });
 
-  // Preserve list formatting
+  // Preserve list formatting with inline styles
   (wrapper.querySelectorAll("ul, ol") as NodeListOf<HTMLElement>).forEach((list) => {
     list.style.marginLeft = "20px";
     list.style.marginBottom = "10px";
+    list.style.paddingLeft = "20px";
   });
 
   wrapper.querySelectorAll("li").forEach((li: HTMLElement) => {
     li.style.marginBottom = "4px";
-  });
-
-  // Preserve link styling
-  wrapper.querySelectorAll("a").forEach((a: HTMLElement) => {
-    a.style.color = "#0000EE";
-    a.style.textDecoration = "underline";
-  });
-
-  // Convert empty paragraphs to proper line breaks for spacing
-  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
-    if (p.textContent?.trim() === "" && p.children.length === 0) {
-      p.innerHTML = "<br>";
-      p.style.marginBottom = "0";
-    }
   });
 
   return wrapper.innerHTML;

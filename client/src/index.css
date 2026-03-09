@@ -388,3 +388,30 @@ body {
   font-size: 14px;
   color: #92400e;
 }
+
+/* Floating HubSpot button - stays visible while scrolling */
+.floating-hubspot-btn {
+  position: fixed;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ff7a59;
+  color: #fff;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(255, 122, 89, 0.4);
+  transition: all 0.2s;
+  z-index: 1000;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.5px;
+}
+
+.floating-hubspot-btn:hover {
+  background: #e8643e;
+  box-shadow: 0 6px 20px rgba(255, 122, 89, 0.5);
+  transform: translateY(-50%) scale(1.05);
+}

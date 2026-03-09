@@ -65,18 +65,20 @@ export default function App() {
           </div>
 
           <div className="actions">
-            <a
-              className="btn btn-primary"
-              href={HUBSPOT_SEQUENCES_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open HubSpot Sequences
-            </a>
             <button className="btn btn-secondary" onClick={handleReset}>
               Upload different file
             </button>
           </div>
+
+          {/* Floating button - always visible on right side */}
+          <a
+            className="floating-hubspot-btn"
+            href={HUBSPOT_SEQUENCES_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open HubSpot Sequences
+          </a>
         </>
       )}
     </div>
