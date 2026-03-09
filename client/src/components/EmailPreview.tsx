@@ -38,12 +38,9 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
     // Last paragraph — no trailing breaks
     if (index === paragraphs.length - 1) {
       p.outerHTML = content;
-    } else if (isInsideList || isBeforeList) {
-      // Inside a list item or right before a list — single break
-      p.outerHTML = content + "<br>";
     } else {
-      // Regular paragraph — double break for spacing
-      p.outerHTML = content + "<br><br>";
+      // Single break between all paragraphs
+      p.outerHTML = content + "<br>";
     }
   });
 
