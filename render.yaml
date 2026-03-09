@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: sequence-automation
+    runtime: node
+    buildCommand: npm install && cd server && npm install && cd ../client && npm install && npm run build
+    startCommand: cd server && npx tsx src/index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production

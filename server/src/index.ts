@@ -4,7 +4,7 @@ import path from "path";
 import uploadRouter from "./routes/upload";
 
 const app = express();
-const PORT = 1234;
+const PORT = parseInt(process.env.PORT || "1234", 10);
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
