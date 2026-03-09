@@ -18,36 +18,23 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = bodyHtml;
 
-  // Convert <p> tags to content + line breaks for paragraph spacing.
-  // - Inside list items: single <br>
-  // - Before a list (ul/ol): single <br> (avoid double gap before bullets)
-  // - Regular paragraphs: <br><br> for spacing
-  const paragraphs = wrapper.querySelectorAll("p");
-  paragraphs.forEach((p: HTMLElement, index: number) => {
+  // Keep <p> tags intact and add inline styles for spacing.
+  // HubSpot's editor respects inline styles on <p> elements.
+  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
     const content = p.innerHTML.trim();
-    const isInsideList = p.closest("li") !== null;
-    const nextSibling = p.nextElementSibling;
-    const prevSibling = p.previousElementSibling;
-    const isBeforeList = nextSibling?.tagName === "UL" || nextSibling?.tagName === "OL";
-    const isAfterList = prevSibling?.tagName === "UL" || prevSibling?.tagName === "OL";
-    const isListAdjacent = isInsideList || isBeforeList || isAfterList;
 
-    // Empty paragraph = line break
+    // Empty paragraph — collapse to minimal height
     if (content === "" || content === "<br>") {
-      p.outerHTML = "<br>";
+      p.style.margin = "0";
+      p.style.padding = "0";
+      p.style.lineHeight = "0.5";
+      p.innerHTML = "&nbsp;";
       return;
     }
 
-    // Last paragraph — no trailing breaks
-    if (index === paragraphs.length - 1) {
-      p.outerHTML = content;
-    } else if (isListAdjacent) {
-      // Inside, before, or after a list — single break (no extra gap)
-      p.outerHTML = content + "<br>";
-    } else {
-      // Regular paragraphs — double break for visible spacing
-      p.outerHTML = content + "<br><br>";
-    }
+    // All paragraphs get consistent spacing
+    p.style.margin = "0";
+    p.style.marginBottom = "8px";
   });
 
   // Preserve list formatting with inline styles
