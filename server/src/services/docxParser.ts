@@ -51,6 +51,7 @@ function trySubjectSplit($: cheerio.CheerioAPI): Email[] {
   for (const el of allElements) {
     const $el = $(el);
     const text = $el.text().trim();
+    // Match "Subject:" at start of line — also handle bold/styled subject lines
     const subjectMatch = text.match(/^Subject:\s*(.+)/i);
 
     if (subjectMatch) {
@@ -67,6 +68,11 @@ function trySubjectSplit($: cheerio.CheerioAPI): Email[] {
       currentBodyParts = [];
       currentTextParts = [];
     } else {
+      // Skip empty paragraphs at the start of body (before any real content)
+      const isEmptyElement = text === "" && !$el.find("img, br").length;
+      if (isEmptyElement && currentBodyParts.length === 0) {
+        continue;
+      }
       currentBodyParts.push($.html(el) || "");
       currentTextParts.push(text);
     }
@@ -80,6 +86,12 @@ function trySubjectSplit($: cheerio.CheerioAPI): Email[] {
       bodyHtml: currentBodyParts.join(""),
       bodyText: currentTextParts.join("\n").trim(),
     });
+  }
+
+  // Also check: strip any leading empty paragraphs from each email body
+  for (const email of emails) {
+    email.bodyHtml = email.bodyHtml.replace(/^(<p>\s*<\/p>\s*)+/, "");
+    email.bodyText = email.bodyText.replace(/^\s*\n+/, "");
   }
 
   return emails.length > 1 ? emails : [];

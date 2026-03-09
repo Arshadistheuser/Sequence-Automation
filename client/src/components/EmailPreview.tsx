@@ -7,12 +7,57 @@ interface EmailPreviewProps {
 }
 
 /**
+ * Prepares the HTML body for clipboard copy by adding inline styles
+ * so that formatting (spacing, fonts, etc.) survives pasting into HubSpot.
+ * CSS classes are NOT preserved in clipboard HTML — only inline styles work.
+ */
+function prepareHtmlForClipboard(bodyHtml: string): string {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = bodyHtml;
+
+  // Add spacing to paragraphs
+  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
+    p.style.margin = "0";
+    p.style.marginBottom = "10px";
+    p.style.lineHeight = "1.6";
+  });
+
+  // Preserve list formatting
+  (wrapper.querySelectorAll("ul, ol") as NodeListOf<HTMLElement>).forEach((list) => {
+    list.style.marginLeft = "20px";
+    list.style.marginBottom = "10px";
+  });
+
+  wrapper.querySelectorAll("li").forEach((li: HTMLElement) => {
+    li.style.marginBottom = "4px";
+  });
+
+  // Preserve link styling
+  wrapper.querySelectorAll("a").forEach((a: HTMLElement) => {
+    a.style.color = "#0000EE";
+    a.style.textDecoration = "underline";
+  });
+
+  // Convert empty paragraphs to proper line breaks for spacing
+  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
+    if (p.textContent?.trim() === "" && p.children.length === 0) {
+      p.innerHTML = "<br>";
+      p.style.marginBottom = "0";
+    }
+  });
+
+  return wrapper.innerHTML;
+}
+
+/**
  * Copies rich HTML to clipboard so it pastes with full formatting
  * into HubSpot's template editor (bold, links, lists, line breaks, etc.)
  */
-async function copyRichHtml(html: string, plainText: string): Promise<void> {
+async function copyRichHtml(bodyHtml: string, plainText: string): Promise<void> {
+  const styledHtml = prepareHtmlForClipboard(bodyHtml);
+
   try {
-    const htmlBlob = new Blob([html], { type: "text/html" });
+    const htmlBlob = new Blob([styledHtml], { type: "text/html" });
     const textBlob = new Blob([plainText], { type: "text/plain" });
     await navigator.clipboard.write([
       new ClipboardItem({
@@ -23,7 +68,7 @@ async function copyRichHtml(html: string, plainText: string): Promise<void> {
   } catch {
     // Fallback: use a temporary rich-text editable div to preserve formatting
     const container = document.createElement("div");
-    container.innerHTML = html;
+    container.innerHTML = styledHtml;
     container.style.position = "fixed";
     container.style.left = "-9999px";
     container.contentEditable = "true";
@@ -57,13 +102,15 @@ function EmailCard({ email }: { email: Email }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<"" | "subject" | "body">("");
 
-  const handleCopy = async (what: "subject" | "body") => {
-    if (what === "subject") {
-      await copyPlainText(email.subject);
-    } else {
-      await copyRichHtml(email.bodyHtml, email.bodyText);
-    }
-    setCopied(what);
+  const handleCopySubject = async () => {
+    await copyPlainText(email.subject);
+    setCopied("subject");
+    setTimeout(() => setCopied(""), 2000);
+  };
+
+  const handleCopyBody = async () => {
+    await copyRichHtml(email.bodyHtml, email.bodyText);
+    setCopied("body");
     setTimeout(() => setCopied(""), 2000);
   };
 
@@ -75,8 +122,8 @@ function EmailCard({ email }: { email: Email }) {
         <div className="email-subject">{email.subject}</div>
         <button
           className={`copy-btn ${copied === "subject" ? "copy-btn-success" : ""}`}
-          onClick={() => handleCopy("subject")}
-          title="Copy subject line — paste into HubSpot subject field"
+          onClick={handleCopySubject}
+          title="Copy subject line only — paste into HubSpot subject field"
         >
           {copied === "subject" ? "Copied!" : "Copy Subject"}
         </button>
@@ -99,8 +146,8 @@ function EmailCard({ email }: { email: Email }) {
         </button>
         <button
           className={`copy-btn copy-btn-accent ${copied === "body" ? "copy-btn-success" : ""}`}
-          onClick={() => handleCopy("body")}
-          title="Copy formatted body — paste directly into HubSpot template editor"
+          onClick={handleCopyBody}
+          title="Copy formatted body only — paste directly into HubSpot template editor"
         >
           {copied === "body" ? "Copied with formatting!" : "Copy Body"}
         </button>
