@@ -27,7 +27,10 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
     const content = p.innerHTML.trim();
     const isInsideList = p.closest("li") !== null;
     const nextSibling = p.nextElementSibling;
+    const prevSibling = p.previousElementSibling;
     const isBeforeList = nextSibling?.tagName === "UL" || nextSibling?.tagName === "OL";
+    const isAfterList = prevSibling?.tagName === "UL" || prevSibling?.tagName === "OL";
+    const isListAdjacent = isInsideList || isBeforeList || isAfterList;
 
     // Empty paragraph = line break
     if (content === "" || content === "<br>") {
@@ -38,9 +41,12 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
     // Last paragraph — no trailing breaks
     if (index === paragraphs.length - 1) {
       p.outerHTML = content;
-    } else {
-      // Single break between all paragraphs
+    } else if (isListAdjacent) {
+      // Inside, before, or after a list — single break (no extra gap)
       p.outerHTML = content + "<br>";
+    } else {
+      // Regular paragraphs — double break for visible spacing
+      p.outerHTML = content + "<br><br>";
     }
   });
 
