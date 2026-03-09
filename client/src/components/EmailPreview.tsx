@@ -18,23 +18,14 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = bodyHtml;
 
-  // Keep <p> tags intact and add inline styles for spacing.
-  // HubSpot's editor respects inline styles on <p> elements.
+  // Don't transform <p> tags — HubSpot's editor renders them
+  // with its own default paragraph spacing. Just clean up empty ones.
   wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
     const content = p.innerHTML.trim();
-
-    // Empty paragraph — collapse to minimal height
     if (content === "" || content === "<br>") {
-      p.style.margin = "0";
-      p.style.padding = "0";
-      p.style.lineHeight = "0.5";
-      p.innerHTML = "&nbsp;";
-      return;
+      // Empty paragraph in Word = intentional blank line
+      p.innerHTML = "<br>";
     }
-
-    // All paragraphs get consistent spacing
-    p.style.margin = "0";
-    p.style.marginBottom = "8px";
   });
 
   // Preserve list formatting with inline styles
