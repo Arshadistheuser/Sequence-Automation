@@ -19,11 +19,15 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
   wrapper.innerHTML = bodyHtml;
 
   // Convert <p> tags to content + line breaks for paragraph spacing.
-  // Paragraphs inside list items get single <br>, others get <br><br>.
+  // - Inside list items: single <br>
+  // - Before a list (ul/ol): single <br> (avoid double gap before bullets)
+  // - Regular paragraphs: <br><br> for spacing
   const paragraphs = wrapper.querySelectorAll("p");
   paragraphs.forEach((p: HTMLElement, index: number) => {
     const content = p.innerHTML.trim();
     const isInsideList = p.closest("li") !== null;
+    const nextSibling = p.nextElementSibling;
+    const isBeforeList = nextSibling?.tagName === "UL" || nextSibling?.tagName === "OL";
 
     // Empty paragraph = line break
     if (content === "" || content === "<br>") {
@@ -34,8 +38,8 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
     // Last paragraph — no trailing breaks
     if (index === paragraphs.length - 1) {
       p.outerHTML = content;
-    } else if (isInsideList) {
-      // Inside a list item — single break only, no extra spacing
+    } else if (isInsideList || isBeforeList) {
+      // Inside a list item or right before a list — single break
       p.outerHTML = content + "<br>";
     } else {
       // Regular paragraph — double break for spacing
