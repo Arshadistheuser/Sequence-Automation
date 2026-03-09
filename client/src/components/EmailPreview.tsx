@@ -18,11 +18,12 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = bodyHtml;
 
-  // Convert <p> tags to content + <br><br> for paragraph spacing
-  // This is the most reliable method for HubSpot's editor
+  // Convert <p> tags to content + line breaks for paragraph spacing.
+  // Paragraphs inside list items get single <br>, others get <br><br>.
   const paragraphs = wrapper.querySelectorAll("p");
   paragraphs.forEach((p: HTMLElement, index: number) => {
     const content = p.innerHTML.trim();
+    const isInsideList = p.closest("li") !== null;
 
     // Empty paragraph = line break
     if (content === "" || content === "<br>") {
@@ -30,11 +31,14 @@ function prepareHtmlForClipboard(bodyHtml: string): string {
       return;
     }
 
-    // For the last paragraph, don't add trailing breaks
+    // Last paragraph — no trailing breaks
     if (index === paragraphs.length - 1) {
       p.outerHTML = content;
+    } else if (isInsideList) {
+      // Inside a list item — single break only, no extra spacing
+      p.outerHTML = content + "<br>";
     } else {
-      // Add a blank line after each paragraph for spacing
+      // Regular paragraph — double break for spacing
       p.outerHTML = content + "<br><br>";
     }
   });
