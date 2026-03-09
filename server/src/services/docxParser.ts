@@ -13,138 +13,150 @@ export async function parseDocx(buffer: Buffer, fileName: string): Promise<Parse
   return { sequenceName, emails };
 }
 
-function splitEmails(html: string): Email[] {
-  const $ = cheerio.load(html);
+/**
+ * Detects what kind of separator each element is:
+ * - "subject-line" for "Subject Line: ...", "Subject: ...", "SL: ..."
+ * - "email-header" for "Email 1:", "Email 2:", etc.
+ * - "re-line" for "RE: ..." (follow-up subject lines)
+ * - null for regular body content
+ */
+function detectSeparator(text: string): {
+  type: "subject-line" | "email-header" | "re-line";
+  value: string;
+} | null {
+  // "Subject Line: ..." or "Subject: ..." or "SL: ..."
+  const subjectMatch = text.match(/^(?:Subject\s*(?:Line)?|SL)\s*[:\-–—]\s*(.+)/i);
+  if (subjectMatch) {
+    return { type: "subject-line", value: subjectMatch[1].trim() };
+  }
 
-  // Strategy 1: Look for "Subject:" lines
-  const subjectEmails = trySubjectSplit($);
-  if (subjectEmails.length > 0) return subjectEmails;
+  // "Email 1:", "Email 2:", "Email #3:", etc.
+  const emailHeaderMatch = text.match(/^Email\s*#?\s*(\d+)\s*[:\-–—]?\s*$/i);
+  if (emailHeaderMatch) {
+    return { type: "email-header", value: `Email ${emailHeaderMatch[1]}` };
+  }
 
-  // Strategy 2: Look for "Email N" / "Step N" headings or bold text
-  const headingEmails = tryHeadingSplit($);
-  if (headingEmails.length > 0) return headingEmails;
+  // "RE:" or "Re:" as a standalone subject indicator (for follow-up emails)
+  const reMatch = text.match(/^RE\s*[:\-–—]\s*(.*)$/i);
+  if (reMatch) {
+    return { type: "re-line", value: reMatch[1]?.trim() || "" };
+  }
 
-  // Strategy 3: Split by horizontal rules or lines of dashes
-  const hrEmails = tryHrSplit($);
-  if (hrEmails.length > 0) return hrEmails;
-
-  // Fallback: treat entire document as one email
-  const bodyHtml = $.html("body") || html;
-  const bodyText = $.text().trim();
-  return [
-    {
-      index: 1,
-      subject: "Email 1",
-      bodyHtml,
-      bodyText,
-    },
-  ];
+  return null;
 }
 
-function trySubjectSplit($: cheerio.CheerioAPI): Email[] {
-  const emails: Email[] = [];
+function splitEmails(html: string): Email[] {
+  const $ = cheerio.load(html);
   const allElements = $("body").children().toArray();
+
+  // First pass: tag every element
+  const tagged: Array<{
+    el: any;
+    html: string;
+    text: string;
+    separator: ReturnType<typeof detectSeparator>;
+  }> = [];
+
+  for (const el of allElements) {
+    const $el = $(el);
+    const text = $el.text().trim();
+    const elHtml = $.html(el) || "";
+    tagged.push({
+      el,
+      html: elHtml,
+      text,
+      separator: detectSeparator(text),
+    });
+  }
+
+  // Check if document has any separators at all
+  const hasSeparators = tagged.some((t) => t.separator !== null);
+  if (!hasSeparators) {
+    // Try HR/divider split as fallback
+    const hrResult = tryHrSplit($, allElements);
+    if (hrResult.length > 1) return hrResult;
+
+    // No separators found — return entire doc as one email
+    return [
+      {
+        index: 1,
+        subject: "Email 1",
+        bodyHtml: tagged.map((t) => t.html).join(""),
+        bodyText: tagged.map((t) => t.text).join("\n").trim(),
+      },
+    ];
+  }
+
+  // Second pass: split into emails using separators
+  const emails: Email[] = [];
   let currentSubject = "";
   let currentBodyParts: string[] = [];
   let currentTextParts: string[] = [];
+  let expectingSubjectAfterHeader = false;
 
-  for (const el of allElements) {
-    const $el = $(el);
-    const text = $el.text().trim();
-    // Match variations: "Subject:", "Subject Line:", "Subject line -", "SL:", etc.
-    const subjectMatch = text.match(/^(?:Subject\s*(?:Line)?|SL)\s*[:\-–—]\s*(.+)/i);
+  function saveCurrentEmail() {
+    // Strip leading/trailing empty paragraphs
+    const bodyHtml = currentBodyParts
+      .join("")
+      .replace(/^(<p>\s*<\/p>\s*)+/, "")
+      .replace(/(<p>\s*<\/p>\s*)+$/, "");
+    const bodyText = currentTextParts.join("\n").trim();
 
-    if (subjectMatch) {
-      // Save previous email if exists
-      if (currentSubject || currentBodyParts.length > 0) {
-        emails.push({
-          index: emails.length + 1,
-          subject: currentSubject || `Email ${emails.length + 1}`,
-          bodyHtml: currentBodyParts.join(""),
-          bodyText: currentTextParts.join("\n").trim(),
-        });
+    if (bodyHtml.trim() || bodyText.trim()) {
+      emails.push({
+        index: emails.length + 1,
+        subject: currentSubject || `Email ${emails.length + 1}`,
+        bodyHtml,
+        bodyText,
+      });
+    }
+    currentSubject = "";
+    currentBodyParts = [];
+    currentTextParts = [];
+  }
+
+  for (const item of tagged) {
+    const sep = item.separator;
+
+    if (sep?.type === "subject-line") {
+      // "Subject Line: ..." — starts a new email
+      saveCurrentEmail();
+      currentSubject = sep.value;
+      expectingSubjectAfterHeader = false;
+    } else if (sep?.type === "email-header") {
+      // "Email 2:" — starts a new email, subject might come next as "RE:"
+      saveCurrentEmail();
+      currentSubject = sep.value; // default, may be overridden by RE: line
+      expectingSubjectAfterHeader = true;
+    } else if (sep?.type === "re-line" && expectingSubjectAfterHeader) {
+      // "RE: ..." right after "Email N:" — this is the subject
+      if (sep.value) {
+        currentSubject = `RE: ${sep.value}`;
       }
-      currentSubject = subjectMatch[1].trim();
-      currentBodyParts = [];
-      currentTextParts = [];
+      expectingSubjectAfterHeader = false;
     } else {
-      // Skip empty paragraphs at the start of body (before any real content)
-      const isEmptyElement = text === "" && !$el.find("img, br").length;
-      if (isEmptyElement && currentBodyParts.length === 0) {
+      // Regular body content
+      expectingSubjectAfterHeader = false;
+
+      // Skip empty elements at the start of a body
+      const isEmpty = item.text === "" && !item.html.includes("<img") && !item.html.includes("<br");
+      if (isEmpty && currentBodyParts.length === 0) {
         continue;
       }
-      currentBodyParts.push($.html(el) || "");
-      currentTextParts.push(text);
+
+      currentBodyParts.push(item.html);
+      currentTextParts.push(item.text);
     }
   }
 
-  // Save last email
-  if (currentSubject || currentBodyParts.length > 0) {
-    emails.push({
-      index: emails.length + 1,
-      subject: currentSubject || `Email ${emails.length + 1}`,
-      bodyHtml: currentBodyParts.join(""),
-      bodyText: currentTextParts.join("\n").trim(),
-    });
-  }
+  // Save the last email
+  saveCurrentEmail();
 
-  // Also check: strip any leading empty paragraphs from each email body
-  for (const email of emails) {
-    email.bodyHtml = email.bodyHtml.replace(/^(<p>\s*<\/p>\s*)+/, "");
-    email.bodyText = email.bodyText.replace(/^\s*\n+/, "");
-  }
-
-  return emails.length > 1 ? emails : [];
+  return emails;
 }
 
-function tryHeadingSplit($: cheerio.CheerioAPI): Email[] {
+function tryHrSplit($: cheerio.CheerioAPI, allElements: any[]): Email[] {
   const emails: Email[] = [];
-  const allElements = $("body").children().toArray();
-  let currentTitle = "";
-  let currentBodyParts: string[] = [];
-  let currentTextParts: string[] = [];
-  const headingPattern = /^(Email|Step|Message)\s*#?\s*(\d+)/i;
-
-  for (const el of allElements) {
-    const $el = $(el);
-    const text = $el.text().trim();
-    const tagName = (el as any).tagName?.toLowerCase();
-    const isBold = $el.find("strong, b").length > 0 && $el.find("strong, b").text().trim() === text;
-    const isHeading = tagName === "h1" || tagName === "h2" || tagName === "h3" || isBold;
-
-    if (isHeading && headingPattern.test(text)) {
-      if (currentBodyParts.length > 0) {
-        emails.push({
-          index: emails.length + 1,
-          subject: currentTitle || `Email ${emails.length + 1}`,
-          bodyHtml: currentBodyParts.join(""),
-          bodyText: currentTextParts.join("\n").trim(),
-        });
-      }
-      currentTitle = text;
-      currentBodyParts = [];
-      currentTextParts = [];
-    } else {
-      currentBodyParts.push($.html(el) || "");
-      currentTextParts.push(text);
-    }
-  }
-
-  if (currentBodyParts.length > 0) {
-    emails.push({
-      index: emails.length + 1,
-      subject: currentTitle || `Email ${emails.length + 1}`,
-      bodyHtml: currentBodyParts.join(""),
-      bodyText: currentTextParts.join("\n").trim(),
-    });
-  }
-
-  return emails.length > 1 ? emails : [];
-}
-
-function tryHrSplit($: cheerio.CheerioAPI): Email[] {
-  const emails: Email[] = [];
-  const allElements = $("body").children().toArray();
   let currentBodyParts: string[] = [];
   let currentTextParts: string[] = [];
 
@@ -180,5 +192,5 @@ function tryHrSplit($: cheerio.CheerioAPI): Email[] {
     });
   }
 
-  return emails.length > 1 ? emails : [];
+  return emails;
 }

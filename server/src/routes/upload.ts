@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import mammoth from "mammoth";
 import { parseDocx } from "../services/docxParser";
 
 const upload = multer({
@@ -32,6 +33,21 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Upload error:", error);
     res.status(500).json({ error: error.message || "Failed to parse document" });
+  }
+});
+
+// Debug endpoint: returns the raw HTML from mammoth so we can see the structure
+router.post("/debug", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
+    res.json({ rawHtml: result.value, messages: result.messages });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
