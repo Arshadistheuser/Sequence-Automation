@@ -1,0 +1,390 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f5f7fa;
+  color: #333;
+  line-height: 1.6;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.app h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1a1a2e;
+}
+
+.app .subtitle {
+  color: #666;
+  margin-bottom: 32px;
+  font-size: 15px;
+}
+
+/* Upload Area */
+.upload-area {
+  border: 2px dashed #ccd;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.upload-area:hover,
+.upload-area.dragging {
+  border-color: #4a6cf7;
+  background: #f0f4ff;
+}
+
+.upload-area p {
+  color: #888;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.upload-area .upload-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.upload-area .upload-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #4a6cf7;
+}
+
+/* Sequence Preview */
+.sequence-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sequence-header h2 {
+  font-size: 20px;
+  color: #1a1a2e;
+}
+
+.sequence-info {
+  font-size: 14px;
+  color: #666;
+}
+
+.email-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.email-card {
+  background: #fff;
+  border: 1px solid #e2e5ea;
+  padding: 20px 24px;
+  position: relative;
+}
+
+.email-card:first-child {
+  border-radius: 12px 12px 0 0;
+}
+
+.email-card:last-child {
+  border-radius: 0 0 12px 12px;
+}
+
+.email-card:only-child {
+  border-radius: 12px;
+}
+
+.email-card + .email-card {
+  border-top: none;
+}
+
+.email-card .step-badge {
+  display: inline-block;
+  background: #4a6cf7;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.email-card .email-subject {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1a1a2e;
+}
+
+/* Email body - rendered HTML preserving original formatting */
+.email-card .email-body-preview,
+.email-card .email-body-full {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.65;
+}
+
+.email-card .email-body-preview {
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.email-card .email-body-preview::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: linear-gradient(transparent, #fff);
+  pointer-events: none;
+}
+
+/* Preserve formatting inside rendered email HTML */
+.email-card .email-body-preview p,
+.email-card .email-body-full p {
+  margin-bottom: 0.6em;
+}
+
+.email-card .email-body-preview a,
+.email-card .email-body-full a {
+  color: #4a6cf7;
+  text-decoration: underline;
+}
+
+.email-card .email-body-preview ul,
+.email-card .email-body-preview ol,
+.email-card .email-body-full ul,
+.email-card .email-body-full ol {
+  margin-left: 1.5em;
+  margin-bottom: 0.6em;
+}
+
+.email-card .toggle-btn {
+  background: none;
+  border: none;
+  color: #4a6cf7;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.email-card .toggle-btn:hover {
+  text-decoration: underline;
+}
+
+/* Connector between cards */
+.email-connector {
+  width: 2px;
+  height: 16px;
+  background: #4a6cf7;
+  margin: 0 auto;
+}
+
+/* Buttons */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #4a6cf7;
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #3a5ce5;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+/* Results */
+.results {
+  margin-top: 24px;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e2e5ea;
+  margin-bottom: -1px;
+}
+
+.result-item:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.result-item:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+.result-item:only-child {
+  border-radius: 8px;
+}
+
+.result-item.success {
+  border-left: 3px solid #22c55e;
+}
+
+.result-item.error {
+  border-left: 3px solid #ef4444;
+}
+
+.result-item .result-subject {
+  flex: 1;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.result-item .result-status {
+  font-size: 13px;
+}
+
+.result-item a {
+  color: #4a6cf7;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.result-item a:hover {
+  text-decoration: underline;
+}
+
+/* Error & Loading */
+.error-banner {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e2e5ea;
+  border-top-color: #4a6cf7;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Email card copy buttons */
+.email-subject-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.email-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.copy-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.copy-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.copy-btn-accent {
+  background: #4a6cf7;
+  color: #fff;
+  border-color: #4a6cf7;
+}
+
+.copy-btn-accent:hover {
+  background: #3a5ce5;
+}
+
+.copy-btn-success {
+  background: #22c55e !important;
+  border-color: #22c55e !important;
+  color: #fff !important;
+}
+
+/* HubSpot note */
+.hubspot-note {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 24px;
+  font-size: 14px;
+  color: #92400e;
+}
