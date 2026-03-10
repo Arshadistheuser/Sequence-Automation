@@ -6,51 +6,91 @@ interface EmailPreviewProps {
   sequenceName: string;
 }
 
-/**
- * Prepares the HTML body for clipboard copy so that formatting survives
- * pasting into HubSpot's template editor.
- *
- * HubSpot's editor strips CSS classes and most styles. The most reliable
- * way to preserve paragraph spacing is to insert <br> tags between
- * paragraphs, because HubSpot respects line breaks natively.
- */
-function prepareHtmlForClipboard(bodyHtml: string): string {
-  const wrapper = document.createElement("div");
-  wrapper.innerHTML = bodyHtml;
-
-  // Don't transform <p> tags — HubSpot's editor renders them
-  // with its own default paragraph spacing. Just clean up empty ones.
-  wrapper.querySelectorAll("p").forEach((p: HTMLElement) => {
-    const content = p.innerHTML.trim();
-    if (content === "" || content === "<br>") {
-      // Empty paragraph in Word = intentional blank line
-      p.innerHTML = "<br>";
-    }
-  });
-
-  // Preserve list formatting with inline styles
-  (wrapper.querySelectorAll("ul, ol") as NodeListOf<HTMLElement>).forEach((list) => {
-    list.style.marginLeft = "20px";
-    list.style.marginBottom = "10px";
-    list.style.paddingLeft = "20px";
-  });
-
-  wrapper.querySelectorAll("li").forEach((li: HTMLElement) => {
-    li.style.marginBottom = "4px";
-  });
-
-  return wrapper.innerHTML;
+interface ContentBlock {
+  type: "paragraph" | "list";
+  html?: string;
+  ordered?: boolean;
+  items?: string[];
 }
 
 /**
- * Copies rich HTML to clipboard so it pastes with full formatting
- * into HubSpot's template editor (bold, links, lists, line breaks, etc.)
+ * Parses email body HTML into structured blocks for the Chrome extension.
  */
+function parseIntoBlocks(bodyHtml: string): ContentBlock[] {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = bodyHtml;
+
+  const blocks: ContentBlock[] = [];
+
+  for (const child of Array.from(wrapper.children)) {
+    const el = child as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === "ul" || tag === "ol") {
+      const items = Array.from(el.querySelectorAll("li")).map(
+        (li) => li.innerHTML.trim()
+      );
+      blocks.push({ type: "list", ordered: tag === "ol", items });
+    } else if (tag === "p") {
+      const content = el.innerHTML.trim();
+      blocks.push({
+        type: "paragraph",
+        html: content === "" || content === "<br>" ? "" : content,
+      });
+    } else {
+      const content = el.innerHTML.trim();
+      if (content) {
+        blocks.push({ type: "paragraph", html: content });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Builds fallback flat HTML for pasting WITHOUT the Chrome extension.
+ * Uses <br> between paragraphs and inline bullets.
+ */
+function buildFallbackHtml(blocks: ContentBlock[]): string {
+  const parts: string[] = [];
+  for (const block of blocks) {
+    if (block.type === "list") {
+      const tag = block.ordered ? "ol" : "ul";
+      const items = (block.items || []).map((item) => `<li>${item}</li>`).join("");
+      parts.push(`<${tag}>${items}</${tag}>`);
+    } else {
+      if (!block.html) {
+        parts.push("<p><br></p>");
+      } else {
+        parts.push(`<p>${block.html}</p>`);
+      }
+    }
+  }
+  return parts.join("");
+}
+
+/**
+ * Builds clipboard HTML with:
+ * 1. SEQAUTO_V1 sentinel for Chrome extension detection
+ * 2. JSON blocks in a <template> tag (invisible, won't render)
+ * 3. Fallback flat HTML for pasting without extension
+ */
+function buildClipboardHtml(bodyHtml: string): string {
+  const blocks = parseIntoBlocks(bodyHtml);
+  // Encode JSON as HTML attribute (escape quotes for safety)
+  const json = JSON.stringify(blocks).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const fallback = buildFallbackHtml(blocks);
+  // Hidden span with data-seqauto carries the structured blocks.
+  // Fallback HTML follows for pasting without the extension.
+  return `<span data-seqauto="${json}" style="display:none"></span>${fallback}`;
+}
+
 async function copyRichHtml(bodyHtml: string, plainText: string): Promise<void> {
-  const styledHtml = prepareHtmlForClipboard(bodyHtml);
+  const html = buildClipboardHtml(bodyHtml);
 
   try {
-    const htmlBlob = new Blob([styledHtml], { type: "text/html" });
+    const htmlBlob = new Blob([html], { type: "text/html" });
     const textBlob = new Blob([plainText], { type: "text/plain" });
     await navigator.clipboard.write([
       new ClipboardItem({
@@ -59,20 +99,17 @@ async function copyRichHtml(bodyHtml: string, plainText: string): Promise<void> 
       }),
     ]);
   } catch {
-    // Fallback: use a temporary rich-text editable div to preserve formatting
     const container = document.createElement("div");
-    container.innerHTML = styledHtml;
+    container.innerHTML = html;
     container.style.position = "fixed";
     container.style.left = "-9999px";
     container.contentEditable = "true";
     document.body.appendChild(container);
-
     const range = document.createRange();
     range.selectNodeContents(container);
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-
     document.execCommand("copy");
     document.body.removeChild(container);
   }

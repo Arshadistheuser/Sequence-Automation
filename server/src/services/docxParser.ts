@@ -25,7 +25,8 @@ function detectSeparator(text: string): {
   value: string;
 } | null {
   // "Subject Line: ..." or "Subject: ..." or "SL: ..."
-  const subjectMatch = text.match(/^(?:Subject\s*(?:Line)?|SL)\s*[:\-–—]\s*(.+)/i);
+  // Also matches "Subject Line:" with no text after (subject may be on next line)
+  const subjectMatch = text.match(/^(?:Subject\s*(?:Line)?|SL)\s*[:\-–—]\s*(.*)/i);
   if (subjectMatch) {
     return { type: "subject-line", value: subjectMatch[1].trim() };
   }
@@ -92,7 +93,7 @@ function splitEmails(html: string): Email[] {
   let currentSubject = "";
   let currentBodyParts: string[] = [];
   let currentTextParts: string[] = [];
-  let expectingSubjectAfterHeader = false;
+  let expectingSubjectAfterHeader: boolean | string = false;
 
   function saveCurrentEmail() {
     // Strip leading/trailing empty paragraphs
@@ -118,15 +119,28 @@ function splitEmails(html: string): Email[] {
   for (const item of tagged) {
     const sep = item.separator;
 
-    if (sep?.type === "subject-line") {
+    if (sep?.type === "subject-line" && expectingSubjectAfterHeader) {
+      // "Subject Line: ..." right after "Email N:" — this is the subject
+      if (sep.value) {
+        currentSubject = sep.value;
+        expectingSubjectAfterHeader = false;
+      } else {
+        // "Subject Line:" with no text — grab next line as subject
+        expectingSubjectAfterHeader = "subject-only";
+      }
+    } else if (sep?.type === "subject-line") {
       // "Subject Line: ..." — starts a new email
       saveCurrentEmail();
-      currentSubject = sep.value;
-      expectingSubjectAfterHeader = false;
+      if (sep.value) {
+        currentSubject = sep.value;
+        expectingSubjectAfterHeader = false;
+      } else {
+        expectingSubjectAfterHeader = "subject-only";
+      }
     } else if (sep?.type === "email-header") {
-      // "Email 2:" — starts a new email, subject might come next as "RE:"
+      // "Email 2:" — starts a new email, subject might come next
       saveCurrentEmail();
-      currentSubject = sep.value; // default, may be overridden by RE: line
+      currentSubject = sep.value; // default, may be overridden by Subject/RE line
       expectingSubjectAfterHeader = true;
     } else if (sep?.type === "re-line" && expectingSubjectAfterHeader) {
       // "RE: ..." right after "Email N:" — this is the subject
@@ -136,6 +150,12 @@ function splitEmails(html: string): Email[] {
       expectingSubjectAfterHeader = false;
     } else {
       // Regular body content
+      if (expectingSubjectAfterHeader === "subject-only" && item.text) {
+        // Only grab text as subject after an empty "Subject Line:" marker
+        currentSubject = item.text;
+        expectingSubjectAfterHeader = false;
+        continue;
+      }
       expectingSubjectAfterHeader = false;
 
       // Skip empty elements at the start of a body
